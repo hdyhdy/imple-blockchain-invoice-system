@@ -1,0 +1,7 @@
+node_modules/
+*.log
+*.jar
+target/
+dist/
+.env
+.DS_Store

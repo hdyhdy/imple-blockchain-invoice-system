@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- FISCO BCOS SDK 配置 -->
+    <bean id="bcosSDK" class="org.fisco.bcos.sdk.BcosSDK">
+        <constructor-arg name="configFile" value="classpath:config/fisco.properties"/>
+    </bean>
+
+    <!-- 客户端配置 -->
+    <bean id="client" class="org.fisco.bcos.sdk.client.Client">
+        <constructor-arg name="groupID" value="1"/>
+        <constructor-arg name="bcosSDK" ref="bcosSDK"/>
+    </bean>
+
+</beans>

@@ -1,0 +1,46 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: invoice-system
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/invoice_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root
+    password: root
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.invoice.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# FISCO BCOS Configuration
+fisco:
+  config:
+    # 区块链节点配置
+    network:
+      peers:
+        - "127.0.0.1:20200"
+        - "127.0.0.1:20201"
+    # 链Id
+    chain-id: 1
+    # 群组Id
+    group-id: 1
+    # 配置文件路径
+    config-file: classpath:config/applicationContext.xml
+  # 智能合约地址（部署后填入）
+  contract:
+    address: "0x0000000000000000000000000000000000000000"
+
+# File upload path
+file:
+  upload:
+    path: ./uploads/invoices
+
+# Invoice settings
+invoice:
+  code-prefix: "011001900111"
+  check-code-length: 6
