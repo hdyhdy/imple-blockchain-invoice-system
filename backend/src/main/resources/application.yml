@@ -7,8 +7,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/invoice_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
-    username: root
-    password: root
+    username: invoice
+    password: your_password
 
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -33,7 +33,7 @@ fisco:
     config-file: classpath:config/applicationContext.xml
   # 智能合约地址（部署后填入）
   contract:
-    address: "0x0000000000000000000000000000000000000000"
+    address: "0xc8ead4b26b2c6ac14c9fd90d9684c9bc2cc4008"
 
 # File upload path
 file:
