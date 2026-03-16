@@ -1,5 +1,6 @@
 package com.invoice.config;
 
+import com.invoice.blockchain.InvoiceRegistry;
 import org.fisco.bcos.sdk.BcosSDK;
 import org.fisco.bcos.sdk.client.Client;
 import org.fisco.bcos.sdk.crypto.keypair.CryptoKeyPair;
