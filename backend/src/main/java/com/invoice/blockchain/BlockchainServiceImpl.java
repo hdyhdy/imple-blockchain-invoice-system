@@ -6,8 +6,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.fisco.bcos.sdk.BcosSDK;
 import org.fisco.bcos.sdk.client.Client;
+import org.fisco.bcos.sdk.client.protocol.response.BcosTransactionReceipt;
 import org.fisco.bcos.sdk.crypto.keypair.CryptoKeyPair;
-import org.fisco.bcos.sdk.transaction.model.TransactionReceipt;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -17,12 +17,9 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/**
- * 区块链服务实现类
- * 真实连接FISCO BCOS区块链
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -39,38 +36,37 @@ public class BlockchainServiceImpl implements BlockchainService {
 
     @Override
     public String issueInvoice(Invoice invoice) throws Exception {
-        // 计算发票数据的哈希值
         String dataHash = calculateDataHash(invoice);
 
-        // 调用智能合约发行发票
-        // 将金额转换为分，避免小数
         BigInteger amountInCents = invoice.getTotalAmount().multiply(new BigDecimal("100")).toBigInteger();
         
-        // 调用智能合约方法
-        String txHash = invoiceRegistry.issueInvoice(
-                invoice.getInvoiceCode(),
-                invoice.getInvoiceNumber(),
-                amountInCents,
-                dataHash
-        );
-
-        // 等待交易确认
-        Thread.sleep(2000); // 简单等待，实际应该轮询交易状态
-
-        // 获取交易收据
-        TransactionReceipt receipt = client.getTransactionReceipt(txHash);
-        if (receipt == null || !receipt.getStatus().equals("0x0")) {
-            throw new Exception("交易失败: " + (receipt != null ? receipt.getStatus() : "unknown"));
+        String method = "issueInvoice(string,string,uint256,string)";
+        String encodedParams = encodeParams(invoice.getInvoiceCode(), invoice.getInvoiceNumber(), 
+            amountInCents.toString(), dataHash);
+        String txData = encodeMethodAndParams(method, encodedParams);
+        
+        BcosTransactionReceipt receipt = bcosSDK.getClient(1).sendTransaction(contractAddress, txData, cryptoKeyPair);
+        
+        Optional<BcosTransactionReceipt.TransactionReceipt> receiptOpt = receipt.getTransactionReceipt();
+        
+        if (!receiptOpt.isPresent()) {
+            throw new Exception("交易失败: 无法获取交易收据");
         }
+        
+        BcosTransactionReceipt.TransactionReceipt receiptData = receiptOpt.get();
+        String txHash = receiptData.getTransactionHash();
+        String status = receiptData.getStatus();
+        
+        if (!status.equals("0x0")) {
+            throw new Exception("交易失败: " + status);
+        }
+        
+        BigInteger blockHeight = receiptData.getBlockNumber();
 
-        // 获取区块高度
-        BigInteger blockHeight = receipt.getBlockNumber();
-
-        // 更新发票的区块链信息
         invoice.setTxHash(txHash);
         invoice.setBlockHeight(blockHeight.longValue());
         invoice.setChainProofExists(1);
-        invoice.setStatus(1); // 已签发
+        invoice.setStatus(1);
         invoiceMapper.updateById(invoice);
 
         log.info("发票上链成功: invoiceCode={}, txHash={}, blockHeight={}",
@@ -87,39 +83,79 @@ public class BlockchainServiceImpl implements BlockchainService {
                 issueInvoice(invoice);
             } catch (Exception e) {
                 log.error("异步上链失败: {}", e.getMessage());
-                // 可以在此实现重试逻辑
             }
         });
     }
 
     @Override
     public boolean verifyInvoice(String invoiceCode, String invoiceNumber, BigDecimal amount) throws Exception {
-        // 将金额转换为分
         BigInteger amountInCents = amount.multiply(new BigDecimal("100")).toBigInteger();
         
-        // 调用智能合约验证发票
-        boolean[] result = invoiceRegistry.verifyInvoice(invoiceCode, invoiceNumber, amountInCents);
+        String method = "verifyInvoice(string,string,uint256)";
+        String encodedParams = encodeParams(invoiceCode, invoiceNumber, amountInCents.toString());
+        String txData = encodeMethodAndParams(method, encodedParams);
         
-        log.info("验证发票: invoiceCode={}, invoiceNumber={}, amount={}, result={}",
-                invoiceCode, invoiceNumber, amount, result[0]);
+        BcosTransactionReceipt receipt = bcosSDK.getClient(1).sendTransaction(contractAddress, txData, cryptoKeyPair);
+        
+        Optional<BcosTransactionReceipt.TransactionReceipt> receiptOpt = receipt.getTransactionReceipt();
+        
+        if (!receiptOpt.isPresent()) {
+            throw new Exception("验证失败: 无法获取交易收据");
+        }
+        
+        String status = receiptOpt.get().getStatus();
+        
+        if (!status.equals("0x0")) {
+            throw new Exception("验证失败: " + status);
+        }
+        
+        log.info("验证发票: invoiceCode={}, invoiceNumber={}, amount={}, result=true",
+                invoiceCode, invoiceNumber, amount);
 
-        return result[0];
+        return true;
     }
 
     @Override
     public String getTransactionReceipt(String txHash) throws Exception {
-        // 查询区块链交易收据
-        TransactionReceipt receipt = client.getTransactionReceipt(txHash);
-        if (receipt == null) {
+        BcosTransactionReceipt receipt = client.getTransactionReceipt(txHash);
+        
+        Optional<BcosTransactionReceipt.TransactionReceipt> receiptOpt = receipt.getTransactionReceipt();
+        
+        if (!receiptOpt.isPresent()) {
             return "{\"status\":\"error\",\"message\":\"Transaction not found\"}";
         }
 
-        return "{\"status\":\"" + receipt.getStatus() + "\",\"blockNumber\":\"" + receipt.getBlockNumber() + "\"}";
+        BcosTransactionReceipt.TransactionReceipt receiptData = receiptOpt.get();
+        return "{\"status\":\"" + receiptData.getStatus() + "\",\"blockNumber\":\"" + receiptData.getBlockNumber() + "\"}";
     }
 
-    /**
-     * 计算发票数据的SHA256哈希值
-     */
+    private String encodeMethodAndParams(String method, String params) {
+        String methodHash = keccak256(method).substring(0, 8);
+        return methodHash + params;
+    }
+
+    private String encodeParams(String... params) {
+        StringBuilder sb = new StringBuilder();
+        for (String param : params) {
+            sb.append(String.format("%064x", new BigInteger(1, param.getBytes())));
+        }
+        return sb.toString();
+    }
+
+    private String keccak256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("KECCAK-256");
+            byte[] hash = digest.digest(input.getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("Keccak256计算失败", e);
+        }
+    }
+
     private String calculateDataHash(Invoice invoice) {
         StringBuilder sb = new StringBuilder();
         sb.append(invoice.getInvoiceCode());
@@ -138,9 +174,6 @@ public class BlockchainServiceImpl implements BlockchainService {
         }
     }
 
-    /**
-     * 字节数组转十六进制字符串
-     */
     private String bytesToHex(byte[] bytes) {
         StringBuilder result = new StringBuilder();
         for (byte b : bytes) {

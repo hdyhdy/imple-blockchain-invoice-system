@@ -5,10 +5,6 @@ import org.fisco.bcos.sdk.crypto.keypair.CryptoKeyPair;
 
 import java.math.BigInteger;
 
-/**
- * 智能合约InvoiceRegistry的Java封装类
- * 实际使用时，应通过FISCO BCOS的代码生成工具生成
- */
 public class InvoiceRegistry {
 
     private final Client client;
@@ -25,33 +21,15 @@ public class InvoiceRegistry {
         return new InvoiceRegistry(client, cryptoKeyPair, contractAddress);
     }
 
-    /**
-     * 发行发票
-     */
-    public String issueInvoice(String invoiceCode, String invoiceNumber, BigInteger amount, String dataHash) throws Exception {
-        // 实际实现应调用智能合约的issueInvoice方法
-        // 这里使用模拟实现，实际应通过web3sdk生成的代码实现
-        log.info("调用智能合约发行发票: invoiceCode={}, invoiceNumber={}, amount={}, dataHash={}",
-                invoiceCode, invoiceNumber, amount, dataHash);
-        
-        // 模拟返回交易哈希
-        return "0x" + java.util.UUID.randomUUID().toString().replace("-", "");
+    public Client getClient() {
+        return client;
     }
 
-    /**
-     * 验证发票
-     */
-    public boolean[] verifyInvoice(String invoiceCode, String invoiceNumber, BigInteger amount) throws Exception {
-        // 实际实现应调用智能合约的verifyInvoice方法
-        // 这里使用模拟实现，实际应通过web3sdk生成的代码实现
-        log.info("调用智能合约验证发票: invoiceCode={}, invoiceNumber={}, amount={}",
-                invoiceCode, invoiceNumber, amount);
-        
-        // 模拟返回验证结果
-        return new boolean[]{true};
+    public CryptoKeyPair getCryptoKeyPair() {
+        return cryptoKeyPair;
     }
 
-    private void log(String message, Object... args) {
-        System.out.printf(message + "\n", args);
+    public String getContractAddress() {
+        return contractAddress;
     }
 }
